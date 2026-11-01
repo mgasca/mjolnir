@@ -15,7 +15,7 @@ selects Mjolnir's `unconstrained` execution policy. The `permissions` setting is
 only available for a bare runtime on an SSH machine. Mjolnir translates the policy into the
 selected harness's own control: Codex `agent-full-access`, Claude Code
 `bypassPermissions`, Kimi Code `auto`, Grok Build's `--always-approve` launch
-flag, OpenCode's `"permission": "allow"` config setting, or DSH's
+flag, OpenCode's `"permission": "allow"` config setting, Copilot or DSH's
 `permission_mode` `allow`.
 Muse stages `:ask-me`, selects `allowAll` approvals, turns muse-acp's auto-review
 off, and disables only the sandbox (`--disable-sandbox`), so it runs without
@@ -28,7 +28,7 @@ calls.
 
 Bare localhost sessions preserve configured approvals for supported harnesses.
 Codex, Claude Code, Grok Build, and Muse Code expose guardian modes. Kimi Code
-does not, and neither do OpenCode and DSH: they ask before tools
+does not, and neither do OpenCode, Copilot and DSH: they ask before tools
 (DSH before every write, command, and MCP tool call), but run every command
 directly on the host without a sandbox. The dashboard warns against running
 any of these on a raw, unsandboxed target.

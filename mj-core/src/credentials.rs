@@ -211,7 +211,41 @@ pub fn write_claude_oauth_token(path: &Path, bytes: &[u8]) -> Result<()> {
 ///
 /// Anything unparseable is `None` rather than a guess.
 pub fn credential_freshness(kind: HarnessKind, bytes: &[u8]) -> Option<i64> {
-    kind.credential_freshness_ms(&serde_json::from_slice(bytes).ok()?)
+    kind.credential_freshness_ms(&credential_json(kind, bytes)?)
+}
+
+/// A harness's credential file parsed as JSON, or `None` when it is not.
+///
+/// Copilot CLI's `config.json` opens with `//` comment lines ("User settings
+/// belong in settings.json." and "This file is managed automatically.") before
+/// its JSON object, so those lines are dropped first for Copilot. Every other
+/// harness's file is plain JSON.
+pub fn credential_json(kind: HarnessKind, bytes: &[u8]) -> Option<serde_json::Value> {
+    match kind {
+        HarnessKind::Copilot => {
+            let text = std::str::from_utf8(bytes).ok()?;
+            let json: String = text
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("//"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            serde_json::from_str(&json).ok()
+        }
+        _ => serde_json::from_slice(bytes).ok(),
+    }
+}
+
+/// Whether a Copilot CLI `config.json` holds a stored login: a non-empty
+/// `authTokens` object, which `copilot login` writes when the host has no OS
+/// keychain. The file exists without one from Copilot's first launch on.
+pub fn copilot_config_has_login(bytes: &[u8]) -> bool {
+    credential_json(HarnessKind::Copilot, bytes)
+        .and_then(|json| {
+            json.get("authTokens")?
+                .as_object()
+                .map(|tokens| !tokens.is_empty())
+        })
+        .unwrap_or(false)
 }
 
 /// Epoch milliseconds at which the stored access token stops working, for the
@@ -225,7 +259,7 @@ pub fn credential_freshness(kind: HarnessKind, bytes: &[u8]) -> Option<i64> {
 ///
 /// Anything unparseable is `None` rather than a guess.
 pub fn credential_expiry(kind: HarnessKind, bytes: &[u8]) -> Option<i64> {
-    kind.credential_expiry_ms(&serde_json::from_slice(bytes).ok()?)
+    kind.credential_expiry_ms(&credential_json(kind, bytes)?)
 }
 
 impl HarnessKind {
@@ -326,8 +360,9 @@ impl HarnessKind {
                 })
                 .max(),
             // OpenCode's logins live in its database, which no copy orders,
-            // and DSH has no login.
-            Self::OpenCode | Self::Dsh => None,
+            // DSH has no login, and Copilot's `config.json` records a token
+            // with no refresh or expiry to order copies by.
+            Self::OpenCode | Self::Dsh | Self::Copilot => None,
         }
     }
 
@@ -343,7 +378,7 @@ impl HarnessKind {
             Self::Muse => muse_login_expiry_ms(json),
             // None of these has a proactive-refresh path, so none reports an
             // expiry Hel would act on: each refreshes its own tokens on demand.
-            Self::Grok | Self::OpenCode | Self::Dsh => None,
+            Self::Grok | Self::OpenCode | Self::Dsh | Self::Copilot => None,
         }
     }
 
@@ -356,7 +391,7 @@ impl HarnessKind {
         let arguments = match self {
             Self::Claude => vec!["auth".to_owned(), "login".to_owned()],
             Self::OpenCode => vec!["auth".to_owned(), "login".to_owned()],
-            Self::Codex | Self::Kimi | Self::Grok | Self::Muse => vec!["login".to_owned()],
+            Self::Codex | Self::Kimi | Self::Grok | Self::Muse | Self::Copilot => vec!["login".to_owned()],
             // dsh-acp has no login; its profiles authenticate with an API
             // key, so `login_command` refuses before this is reached.
             Self::Dsh => Vec::new(),
@@ -383,7 +418,7 @@ fn jwt_expiry_millis(token: &str) -> Option<i64> {
 
 /// Reject anything that is not a plausible credential document before it
 /// replaces a canonical file or lands in a session home.
-pub fn validate_credential_payload(_kind: HarnessKind, bytes: &[u8]) -> Result<()> {
+pub fn validate_credential_payload(kind: HarnessKind, bytes: &[u8]) -> Result<()> {
     if bytes.is_empty() {
         bail!("credential payload is empty");
     }
@@ -393,8 +428,8 @@ pub fn validate_credential_payload(_kind: HarnessKind, bytes: &[u8]) -> Result<(
             bytes.len()
         );
     }
-    let text = std::str::from_utf8(bytes).context("credential payload is not valid UTF-8")?;
-    serde_json::from_str::<serde_json::Value>(text).context("credential payload is not JSON")?;
+    std::str::from_utf8(bytes).context("credential payload is not valid UTF-8")?;
+    credential_json(kind, bytes).context("credential payload is not JSON")?;
     Ok(())
 }
 

@@ -476,6 +476,7 @@ pub(super) fn collect_native_tree(
         HarnessKind::Muse => inside && name == "session.jsonl",
         HarnessKind::OpenCode => is_opencode_native_artifact(relative),
         HarnessKind::Dsh => is_dsh_session_record(relative, session_id),
+        HarnessKind::Copilot => is_copilot_session_artifact(relative, session_id),
     };
     if !selected {
         return Ok(());
@@ -503,6 +504,25 @@ pub(super) fn collect_native_tree(
 /// interrupted write's temporary file is never captured.
 pub(super) fn is_dsh_session_record(relative_path: &Path, session_id: &str) -> bool {
     relative_path == Path::new("sessions").join(format!("{session_id}.json"))
+}
+
+/// Copilot CLI keeps a session under `session-state/<id>/`: `workspace.yaml`,
+/// `events.jsonl`, and the `files/`, `checkpoints/` and `research/` trees.
+/// While the process runs the directory also holds `inuse.<pid>.hold`,
+/// `inuse.<pid>.lock` and `.workspace-fork.lock`, which describe that process
+/// and must not be restored; `session-state/.session-operation-locks/` is
+/// outside the session's directory and is never selected.
+pub(super) fn is_copilot_session_artifact(relative_path: &Path, session_id: &str) -> bool {
+    let mut components = relative_path.components();
+    if components.next() != Some(Component::Normal("session-state".as_ref()))
+        || components.next() != Some(Component::Normal(session_id.as_ref()))
+    {
+        return false;
+    }
+    relative_path.components().skip(2).all(|component| {
+        matches!(component, Component::Normal(name)
+            if name.to_str().is_some_and(|name| !name.starts_with('.') && !name.starts_with("inuse.")))
+    })
 }
 
 /// OpenCode's database within a session home.

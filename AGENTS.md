@@ -282,6 +282,12 @@ container sessions run the same harness versions as managed bare workers:
   the new tag. The test
   `opencode_provider_environment_was_generated_from_the_pinned_opencode`
   fails until you do.
+- Copilot CLI: update `COPILOT_VERSION` in `mj-core/src/harness_runtime.rs`
+  and the per-platform archive digests in `mj-core/assets/copilot/runtime.json`
+  from the release's `SHA256SUMS.txt`. It is not in the image; bare targets
+  and containers install the verified release archive on demand. The test
+  `bridge_fallback_pins_match_the_agent_dev_containerfile` fails if the
+  manifest and the pin disagree.
 
 Pushing the commit to master runs `publish-agent-dev-image.yml`, which
 publishes `ghcr.io/brokkai/mjolnir/agent-dev:latest`. Check that the run

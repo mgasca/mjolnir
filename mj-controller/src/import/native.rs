@@ -221,6 +221,7 @@ pub fn locate_native_session(
             "OpenCode keeps its sessions in a SQLite database; Mjolnir cannot import them yet"
         ),
         HarnessKind::Dsh => bail!("Mjolnir cannot import DSH sessions yet"),
+        HarnessKind::Copilot => bail!("Mjolnir cannot import Copilot CLI sessions yet"),
     };
     Ok(LocatedNativeSession {
         native_session_id,
@@ -246,7 +247,7 @@ pub fn native_session_id_from_path(harness: HarnessKind, path: &Path) -> Option<
         HarnessKind::Muse => path.parent()?.file_name()?.to_str().map(str::to_owned),
         // OpenCode sessions live in SQLite rows, not files, so no transcript
         // path carries their id; DSH sessions are not imported.
-        HarnessKind::OpenCode | HarnessKind::Dsh => None,
+        HarnessKind::OpenCode | HarnessKind::Dsh | HarnessKind::Copilot => None,
     }
 }
 
@@ -294,6 +295,7 @@ pub fn list_native_session_sources(
             "OpenCode keeps its sessions in a SQLite database; Mjolnir cannot enumerate them yet"
         ),
         HarnessKind::Dsh => bail!("Mjolnir cannot enumerate DSH sessions yet"),
+        HarnessKind::Copilot => bail!("Mjolnir cannot enumerate Copilot CLI sessions yet"),
         other => bail!("{other:?} keeps one session per file; there is nothing to enumerate"),
     };
     Ok(sources)
@@ -327,14 +329,15 @@ pub fn read_native_transcript(
             "OpenCode keeps its sessions in a SQLite database; Mjolnir cannot import them yet"
         ),
         HarnessKind::Dsh => bail!("Mjolnir cannot import DSH sessions yet"),
+        HarnessKind::Copilot => bail!("Mjolnir cannot import Copilot CLI sessions yet"),
     }
 }
 
 /// Whether Mjolnir can list this harness's native sessions at all. The
-/// harnesses that keep sessions in a database, and DSH, cannot be scanned yet;
-/// callers skip them instead of reporting the scan as a failure.
+/// harnesses that keep sessions in a database, DSH and Copilot CLI cannot be
+/// scanned yet; callers skip them instead of reporting the scan as a failure.
 pub fn native_sessions_enumerable(harness: HarnessKind) -> bool {
-    !matches!(harness, HarnessKind::OpenCode | HarnessKind::Dsh)
+    !matches!(harness, HarnessKind::OpenCode | HarnessKind::Dsh | HarnessKind::Copilot)
 }
 
 /// Scan a harness home newest first, reporting after every candidate.
@@ -414,5 +417,6 @@ pub fn scan_native_sessions(
             "OpenCode keeps its sessions in a SQLite database; Mjolnir cannot enumerate them yet"
         ),
         HarnessKind::Dsh => bail!("Mjolnir cannot enumerate DSH sessions yet"),
+        HarnessKind::Copilot => bail!("Mjolnir cannot enumerate Copilot CLI sessions yet"),
     }
 }

@@ -16,6 +16,10 @@ use crate::config::HarnessKind;
 use super::{dialect::grok, find_session_config_option, select_contains};
 
 const FAST_MODE_CONFIG_ID: &str = "fast-mode";
+/// Copilot CLI names its modes with the ACP documentation's URLs rather than
+/// bare words, on both its `mode` config option and its session modes.
+pub const COPILOT_AGENT_MODE: &str = "https://agentclientprotocol.com/protocol/session-modes#agent";
+pub const COPILOT_PLAN_MODE: &str = "https://agentclientprotocol.com/protocol/session-modes#plan";
 const FAST_MODE_ON: &str = "on";
 const FAST_MODE_OFF: &str = "off";
 
@@ -192,7 +196,7 @@ impl AcpSessionSurface {
         self.plan_mode_change_pending = true;
         self.current_mode = Some(
             if active {
-                "plan"
+                self.plan_mode_id()
             } else {
                 self.execution_mode_id()
             }
@@ -204,7 +208,7 @@ impl AcpSessionSurface {
         self.plan_mode_change_pending = false;
         self.current_mode = Some(
             if active {
-                "plan"
+                self.plan_mode_id()
             } else {
                 self.execution_mode_id()
             }
@@ -230,7 +234,17 @@ impl AcpSessionSurface {
         match self.harness_kind {
             Some(HarnessKind::OpenCode) => "build",
             Some(HarnessKind::Dsh) => "agent",
+            Some(HarnessKind::Copilot) => COPILOT_AGENT_MODE,
             _ => "default",
+        }
+    }
+
+    /// The mode id that is Plan for this harness: `plan` everywhere but
+    /// Copilot CLI, whose ids are URLs.
+    fn plan_mode_id(&self) -> &'static str {
+        match self.harness_kind {
+            Some(HarnessKind::Copilot) => COPILOT_PLAN_MODE,
+            _ => "plan",
         }
     }
 
@@ -239,7 +253,7 @@ impl AcpSessionSurface {
     }
 
     pub fn plan_mode_active(&self) -> bool {
-        self.supports_plan_mode() && self.current_mode() == Some("plan")
+        self.supports_plan_mode() && self.current_mode() == Some(self.plan_mode_id())
     }
 
     pub fn plan_control(&self, active: bool) -> Result<PlanControl, PlanControlError> {
@@ -271,12 +285,13 @@ impl AcpSessionSurface {
             // OpenCode and dsh-acp advertise their modes as a
             // `mode` select whose normal value is not `default`, so Hel's
             // plan toggle maps onto that value instead.
-            Some(HarnessKind::OpenCode | HarnessKind::Dsh) => {
+            Some(HarnessKind::OpenCode | HarnessKind::Dsh | HarnessKind::Copilot) => {
                 let execution = self.execution_mode_id();
+                let plan = self.plan_mode_id();
                 self.exact_config_has_pair("mode", execution)
                     .then(|| PlanControl::SetConfig {
                         key: "mode".into(),
-                        value: if active { "plan" } else { execution }.into(),
+                        value: if active { plan } else { execution }.into(),
                     })
                     .ok_or(PlanControlError::Incompatible)
             }
@@ -369,9 +384,10 @@ impl AcpSessionSurface {
     }
 
     fn exact_config_has_pair(&self, key: &str, other: &str) -> bool {
+        let plan = self.plan_mode_id();
         self.config_options.iter().any(|option| {
             option.id.to_string() == key
-                && select_contains(&option.kind, "plan")
+                && select_contains(&option.kind, plan)
                 && select_contains(&option.kind, other)
         })
     }
@@ -513,6 +529,7 @@ mod tests {
         for (harness, normal) in [
             (HarnessKind::OpenCode, "build"),
             (HarnessKind::Dsh, "agent"),
+            (HarnessKind::Copilot, COPILOT_AGENT_MODE, COPILOT_PLAN_MODE),
         ] {
             let mut surface = AcpSessionSurface::default();
             surface.set_harness_kind(harness);
@@ -523,12 +540,16 @@ mod tests {
                     SessionConfigValueId::new(normal),
                     SessionConfigSelectOptions::Ungrouped(vec![
                         SessionConfigSelectOption::new(normal, "Normal"),
-                        SessionConfigSelectOption::new("plan", "Plan"),
+                        SessionConfigSelectOption::new(plan, "Plan"),
                     ]),
                 )),
             )]);
+            assert!(
+                !surface.plan_mode_active(),
+                "{harness:?} starts outside Plan"
+            );
 
-            for (active, value) in [(true, "plan"), (false, normal)] {
+            for (active, value) in [(true, plan), (false, normal)] {
                 assert_eq!(
                     surface.plan_control(active),
                     Ok(PlanControl::SetConfig {

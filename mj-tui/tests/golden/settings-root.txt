@@ -859,10 +859,8 @@ Terminal Light after save acknowledgement: rendered colors: text fg=Reset bg=Res
   │ Muse account; container use is supported                                                     │
   │   OpenCode                                                                                   │
   │ OpenCode provider login or an API key                                                        │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
+  │   Copilot CLI                                                                                │
+  │ GitHub Copilot subscription                                                                  │
   │                                                                                              │
   │                                                                                              │
   │ Where it runs is chosen when you create a session. Use a local Podman, Docker, or Apple      │

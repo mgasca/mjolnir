@@ -263,7 +263,7 @@ archive material.
 
 Muse Code ACP supports one workspace root only. Pair it with a
 single-repository bundle or one bare project directory, and do not add attached
-directories. The other six supported harnesses, DSH included, accept
+directories. The other seven supported harnesses, DSH and Copilot CLI included, accept
 multi-root bundles.
 
 Attached directories are not bundle members. They are per-session supplemental

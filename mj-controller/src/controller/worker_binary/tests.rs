@@ -2215,7 +2215,7 @@ fn podman_worker_start_and_upgrade_use_each_containers_recorded_identity() {
 #[test]
 fn bridge_fallback_pins_match_the_agent_dev_containerfile() {
     use mj_core::harness_runtime::{
-        CLAUDE_CLI_VERSION, DSH_ACP_PACKAGE, DSH_ACP_VERSION, GROK_VERSION, KIMI_VERSION,
+        CLAUDE_CLI_VERSION, COPILOT_VERSION, DSH_ACP_PACKAGE, DSH_ACP_VERSION, GROK_VERSION, KIMI_VERSION,
         MUSE_ACP_PACKAGE, MUSE_ACP_VERSION, OPENCODE_VERSION,
     };
 
@@ -2287,6 +2287,36 @@ fn bridge_fallback_pins_match_the_agent_dev_containerfile() {
             argument.contains(&format!("npx -y {DSH_ACP_PACKAGE}@{DSH_ACP_VERSION}"))
         }),
         "the DSH launch must fetch the pinned {DSH_ACP_PACKAGE}@{DSH_ACP_VERSION}"
+    );
+
+    // Copilot CLI has no image layer either: bare targets and containers
+    // install the release archive its manifest pins, which must name the same
+    // version as the pin, and the container fallback runs the image's own
+    // `copilot` as an ACP server.
+    let copilot: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../mj-core/assets/copilot/runtime.json"
+    ))
+    .unwrap();
+    assert_eq!(copilot["version"], COPILOT_VERSION);
+    for platform in [
+        "linux-x86_64",
+        "linux-aarch64",
+        "macos-x86_64",
+        "macos-aarch64",
+    ] {
+        let digest = copilot["platforms"][platform]["sha256"]
+            .as_str()
+            .unwrap_or_else(|| panic!("Copilot CLI manifest lacks a {platform} digest"));
+        assert_eq!(digest.len(), 64, "{platform} digest is not SHA-256 hex");
+    }
+    let (command, arguments) =
+        bridge_launch(HarnessKind::Copilot, ExecutionPolicy::ConfiguredApprovals);
+    assert_eq!(command, "sh");
+    assert!(
+        arguments
+            .iter()
+            .any(|argument| argument.contains("exec copilot --acp")),
+        "the Copilot CLI container fallback must start the image's copilot as an ACP server"
     );
 
     let package: serde_json::Value = serde_json::from_str(include_str!(
@@ -3458,7 +3488,8 @@ fn staging_leaves_harness_owned_skills_to_the_harness() {
             | HarnessKind::Grok
             | HarnessKind::Muse
             | HarnessKind::OpenCode
-            | HarnessKind::Dsh => &[],
+            | HarnessKind::Dsh
+            | HarnessKind::Copilot => &[],
         };
         let home = tempfile::tempdir().unwrap();
         let skill = format!("{}/review/SKILL.md", kind.synced_skill_dirs()[0]);
@@ -5367,6 +5398,22 @@ fn fixture_home_entries(kind: HarnessKind) -> &'static [(&'static str, bool)] {
             ("sessions/dsh-0123.json", false),
             ("sessions/.dsh-0123.4567.tmp", false),
         ],
+        // Copilot CLI: its managed state and plaintext login, the person's
+        // settings and MCP servers, personal instructions and skills, next to
+        // native session state, logs, locks and installed plugins.
+        HarnessKind::Copilot => &[
+            ("config.json", true),
+            ("settings.json", true),
+            ("mcp-config.json", true),
+            ("copilot-instructions.md", true),
+            ("skills/review/SKILL.md", true),
+            ("session-state/0123/events.jsonl", false),
+            ("session-state/0123/workspace.yaml", false),
+            ("session-state/.session-operation-locks/0123.lock", false),
+            ("logs/process-1.log", false),
+            ("installed-plugins/example/plugin.json", false),
+            ("settings.json.lock", false),
+        ],
     }
 }
 
@@ -5545,6 +5592,21 @@ fn login_bytes(kind: HarnessKind, generation: i64) -> Vec<u8> {
             },
         }]),
         HarnessKind::Dsh => panic!("DSH keeps no login; its key comes from DEEPSEEK_API_KEY"),
+        // Copilot's `config.json` opens with comment lines and records a token
+        // without any timestamp, so a copy carries no freshness.
+        HarnessKind::Copilot => {
+            return format!(
+                "// User settings belong in settings.json.\n// This file is managed automatically.\n{}\n",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "authTokens": {
+                        "https://github.com:octocat": {"token": format!("gho_{generation}")}
+                    },
+                    "loggedInUsers": [{"host": "https://github.com", "login": "octocat", "kind": "githubDotCom"}],
+                }))
+                .unwrap()
+            )
+            .into_bytes();
+        }
     };
     serde_json::to_vec(&login).unwrap()
 }
@@ -5684,6 +5746,19 @@ fn a_rotated_login_reaches_the_staged_home_of_a_session_on_this_machine() {
         std::fs::write(&canonical, login_bytes(kind, 2)).unwrap();
         let (profile_copy, profile_bytes) = read_credential_file(kind, &canonical).unwrap();
         let (session_copy, _) = read_credential_file(kind, &endpoint).unwrap();
+        if kind == HarnessKind::Copilot {
+            // Copilot's login never refreshes itself and its file carries no
+            // timestamp, so neither copy can be told fresher: a re-login
+            // reaches new sessions through staging and running sessions keep
+            // the copy they started with.
+            assert_eq!(
+                reconcile(&profile_copy, &session_copy),
+                SyncAction::None,
+                "{kind:?}"
+            );
+            assert_eq!(std::fs::read(&endpoint).unwrap(), login_bytes(kind, 1));
+            continue;
+        }
         assert_eq!(
             reconcile(&profile_copy, &session_copy),
             SyncAction::Push,

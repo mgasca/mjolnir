@@ -30,6 +30,7 @@ include = [
     "assets/opencode-provider-environment.txt",
     # Pinned managed harness packages and verified runtime manifests.
     "assets/harnesses/**",
+    "assets/copilot/runtime.json",
     "assets/grok/runtime.json",
     "assets/kimi/runtime.json",
     "assets/muse/runtime.json",

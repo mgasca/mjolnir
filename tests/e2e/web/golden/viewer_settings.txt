@@ -59,6 +59,7 @@ Grok Build
 Muse Code
 opencode
 DSH
+Copilot CLI
 Account directory
 
 The agent's account directory, such as ~/.codex. Save, then choose Sign in.

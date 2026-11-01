@@ -1,6 +1,6 @@
 ---
 title: Profiles and harnesses
-description: Configure Codex (including Amazon Bedrock and custom model providers), Claude Code, Kimi Code, Grok Build, Muse Code, OpenCode, and DSH accounts, credentials, skills, runtimes, and quota reporting.
+description: Configure Codex (including Amazon Bedrock and custom model providers), Claude Code, Kimi Code, Grok Build, Muse Code, OpenCode, Copilot and DSH accounts, credentials, skills, runtimes, and quota reporting.
 ---
 
 A profile connects Mjolnir to one installed coding-agent harness and one account.
@@ -146,8 +146,9 @@ the model mix and quota charging stay comparable.
 | Muse Code | `muse` | `XDG_CONFIG_HOME` (parent of home) | `~/.config/muse` | `auth.json` | no |
 | OpenCode | `opencode` | `XDG_CONFIG_HOME` (parent of home) | `~/.config/opencode` | a login in `opencode.db`, or a provider key in the environment | no |
 | DSH | `dsh` | `DSH_ACP_DATA_DIR` | `~/.dsh` | `DEEPSEEK_API_KEY` saved in DSH, or in the environment | no |
+| Copilot CLI | `copilot` | `COPILOT_HOME` | `~/.copilot` | a login in `config.json` (the macOS Keychain on a Mac), or `COPILOT_GITHUB_TOKEN` in the environment | no |
 
-There are seven harness kinds. A profile whose `kind` is `mimo`, for the
+There are eight harness kinds. A profile whose `kind` is `mimo`, for the
 removed MiMo Code harness, is ignored with a warning when the configuration
 loads and is removed from the file on the next save. Codex can use its built-in Amazon Bedrock
 providers; see [Codex on Amazon Bedrock](#codex-on-amazon-bedrock). It can also
@@ -168,7 +169,8 @@ path.
 
 Kimi Code does not expose a guardian approval mode. OpenCode asks before tools
 according to its permission rules, and DSH asks before every write, command,
-and MCP tool call other than Mjolnir's own, but both run commands on the host
+and MCP tool call other than Mjolnir's own, and Copilot CLI asks
+before every tool, path outside the workspace, and URL, but all three run commands on the host
 without a sandbox, so they have no guardian either. The dashboard's
 new-session and resume wizards warn before using any of them on a raw target. Muse's guardian is muse-acp's auto-review; see
 [Harness limitations](#harness-limitations).
@@ -686,6 +688,26 @@ preference, sent with each request. Provider names are the endpoint tags that
 `https://openrouter.ai/api/v1/models/<model>/endpoints` lists, such as
 `morph` for `morph/fp8`.
 
+For Copilot CLI, configure `kind = "copilot"`, for example with
+`home = "/home/me/.copilot"`. Detection accepts the `copilot` command or a
+`~/.copilot` home. Copilot CLI speaks ACP itself (`copilot --acp`); Mjolnir
+runs the pinned release 1.0.105. The home holds Copilot's `config.json`
+(managed state and, on a host without an OS keychain, the login), your
+`settings.json`, `mcp-config.json`, personal instructions in
+`copilot-instructions.md`, personal skills under `skills/`, and native session
+state under `session-state/<id>/`. Sign in with `mj login --profile copilot`,
+which runs `copilot login`; on Linux without a keychain, accept plaintext
+storage so the login lands in `config.json` and reaches sessions. A profile may
+instead set `COPILOT_GITHUB_TOKEN` in its `environment` (a fine-grained personal
+access token with the Copilot Requests permission, or a GitHub OAuth token);
+Mjolnir also inherits that variable from the environment it started with.
+`GH_TOKEN` and `GITHUB_TOKEN` do not reach Copilot sessions: inside a session
+`gh` serves Mjolnir's own GitHub token, which Copilot cannot use. Mjolnir owns
+`COPILOT_AUTO_UPDATE` (the pinned binary never updates itself) and
+`COPILOT_ALLOW_ALL` (the target's permission mode decides it); a profile that
+sets either fails to load. `COPILOT_MODEL` may be set to choose the default
+model where the plan offers several.
+
 For DSH, configure `kind = "dsh"`, for example with
 `home = "/home/me/.dsh"`. Detection accepts DeepSeek's own `dsh` CLI, its
 `~/.dsh` home, or `DEEPSEEK_API_KEY` in the environment Mjolnir started with,
@@ -788,6 +810,7 @@ that harness as an ACP agent. It reads the methods the bridge advertises:
 | Muse Code | Runs the ACP `terminal` method `muse-acp login` |
 | OpenCode | Runs the pinned `opencode auth login --standalone` |
 | DSH | none; `mj login` refuses the profile, which authenticates with `DEEPSEEK_API_KEY` |
+| Copilot CLI | Runs the ACP `terminal` method `copilot login` (browser flow on a desktop, device code over SSH); a profile with `COPILOT_GITHUB_TOKEN` needs no login |
 
 Use `--method <id>` when a bridge advertises several methods. Use `--cli` to
 skip ACP and run the harness command found on `PATH`, which is the behavior of
@@ -865,6 +888,7 @@ from the profile home:
 | Muse Code | `auth.json`, `settings.json`, `trust.json`, `AGENTS.md`, `skills/`, `rules/` |
 | OpenCode | `opencode.json`, `opencode.jsonc`, `AGENTS.md`, `skills/`, and the logins from `opencode.db`, as `.data/opencode/mjolnir-credentials.json` |
 | DSH | `AGENTS.md`, `skills/` (staged, but DSH does not read skills) |
+| Copilot CLI | `config.json`, `settings.json`, `mcp-config.json`, `copilot-instructions.md`, `skills/` |
 
 Staging follows symbolic links: a linked file or directory is copied with the
 contents of its target, even when the target is outside the harness home. A link
@@ -904,8 +928,13 @@ Mjolnir then adds its own files to the staged home:
   `DSH_ACP_SYSTEM_PROMPT` cleared), and dsh-acp's `permission_mode` on every
   session open: `ask` under configured approvals, `allow` under an
   unconstrained policy;
+- for Copilot CLI, Mjolnir's `mj-agents` MCP server in `mcp-config.json`
+  (Copilot accepts only HTTP and SSE servers over ACP), and its `allow_all`
+  option on every session open: `off` under configured approvals, `on` under
+  an unconstrained policy;
 - in a container or on an EC2 instance, a note in the instruction file
-  (`AGENTS.md` or `CLAUDE.md`) that the environment is disposable.
+  (`AGENTS.md`, `CLAUDE.md`, or `copilot-instructions.md`) that the environment
+  is disposable.
 
 History, caches, SSH and GPG keys, shell dotfiles, cloud configuration, editor
 state, and package-registry credentials are not copied merely because they sit
@@ -1105,6 +1134,11 @@ OpenCode downloads the pinned OpenCode 2 package for the platform from npm
 and verifies it in-process. Linux and macOS, on x86-64 and ARM64, are supported.
 The pinned installation disables OpenCode's self-update so a running session
 never replaces its own binary.
+Copilot CLI installs from its pinned release archive on GitHub
+(`copilot-<platform>.tar.gz`, about 130 MB) and verifies the SHA-256 digest
+from the release's `SHA256SUMS.txt`; it needs no Node.js runtime. Linux (glibc)
+and macOS, on x86-64 and ARM64, are supported. Every launch sets
+`COPILOT_AUTO_UPDATE=false` so the pinned binary never replaces itself.
 DSH is never installed. A launch uses the target's own `dsh-acp` on `PATH` when
 it is 0.5.0 or newer, or fetches the pinned `@brokkai/dsh-acp@0.5.0` package
 through `npx`, using the compatible system runtime or the managed Node
@@ -1142,6 +1176,7 @@ while the pane has focus. **Refresh** runs the same refresh as
 | Muse Code | Native subscription usage windows and reset times, when reported. The daemon refreshes the Muse login itself, so the reading does not depend on Muse having run. |
 | OpenCode | No published quota endpoint; the profile shows an unavailable reading. |
 | DSH | No quota endpoint; DeepSeek bills by usage, so the profile shows `API`. |
+| Copilot CLI | Copilot shows its premium-request allowance only inside an interactive session (`/usage`), so the profile shows an unavailable reading. |
 
 A Codex profile on a provider that publishes no quota endpoint, and a DSH
 profile, show `API` instead of a window, because they are usage-priced. An
@@ -1194,7 +1229,7 @@ without them. Muse Spark can also supply utility inference for cross-harness
 handoffs; see
 [Durability and recovery](/durability/).
 
-- Kimi Code, OpenCode, and DSH have no guardian approval mode.
+- Kimi Code, OpenCode, Copilot and DSH have no guardian approval mode.
   Prefer an isolated [container target](/containers/) or EC2 rather than raw
   execution.
 - OpenCode talks to third-party providers through its own gateway, so it
@@ -1221,6 +1256,22 @@ handoffs; see
   None. It serves DeepSeek-family
   utility inference with its flash model only when its base URL is DeepSeek's
   own `api.deepseek.com` and its key is set.
+- Copilot CLI has an optional command sandbox, but Mjolnir leaves it off: on
+  Linux it needs bubblewrap with network namespaces, and when it is on but
+  unsupported every command fails. Under configured approvals Mjolnir selects
+  Copilot's `allow_all` `off` on every session open, so every tool, path
+  outside the workspace, and URL asks for permission; an unconstrained policy
+  selects `on`. The Plan toggle switches Copilot to its `plan` mode and back to
+  its `agent` mode. Copilot accepts multiple workspace roots and attached
+  directories. Checkpoints keep the session's `session-state/<id>/` tree, and
+  `session/load` takes the working directory from Mjolnir, so a restore at a
+  different path needs no rewrite. Native import and SessionWiki search do not
+  support Copilot yet. A Copilot session can use Mjolnir's sub-agents, and a
+  Copilot profile can run them: it receives the `mj-agents` tools through its
+  staged `mcp-config.json`. Copilot's model is chosen by its Auto router unless
+  the plan offers several models, in which case the ACP `model` option and
+  `mj models` list them. Copilot has no quota reading outside its interactive
+  session and does not serve Mjolnir's utility inference.
 - A custom bridge must speak the ACP version and features Mjolnir expects.
 - A profile home is account-scoped. Do not point two profiles at the same home
   and expect them to represent different accounts.

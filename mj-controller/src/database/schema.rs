@@ -7,7 +7,7 @@ const COMPATIBILITY_METADATA_VERSION: i64 = 30;
 /// Expected compatibility floor shared by migration regressions. Compatible
 /// migrations advance the revision without changing this contract.
 #[cfg(test)]
-pub(super) const MINIMUM_COMPATIBLE_VERSION: i64 = 124;
+pub(super) const MINIMUM_COMPATIBLE_VERSION: i64 = 125;
 
 pub(super) struct SchemaState {
     pub(super) revision: i64,

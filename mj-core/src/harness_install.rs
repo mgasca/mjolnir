@@ -765,6 +765,7 @@ async fn install_into(
         HarnessKind::Grok => install_grok(staging.path(), environment).await?,
         HarnessKind::Muse => install_muse_native(staging.path(), environment).await?,
         HarnessKind::OpenCode => install_opencode(staging.path(), environment).await?,
+        HarnessKind::Copilot => install_copilot(staging.path(), environment).await?,
         HarnessKind::Dsh => {
             unreachable!("DSH has no managed installation; resolve returns before installing")
         }
@@ -1668,6 +1669,72 @@ async fn install_grok_from_metadata(
     std::os::unix::fs::symlink("grok", bin.join("agent"))
         .context("create managed Grok agent launcher")?;
     Ok(())
+}
+
+/// Install the pinned Copilot CLI release from GitHub. Each release archive
+/// holds one file, the executable `copilot`, and the release publishes a
+/// `SHA256SUMS.txt` whose digests `runtime.json` carries; the npm package
+/// `@github/copilot` is a loader over these same binaries.
+async fn install_copilot(staging: &Path, environment: &BTreeMap<String, String>) -> Result<()> {
+    let metadata: serde_json::Value =
+        serde_json::from_str(include_str!("../assets/copilot/runtime.json"))?;
+    install_copilot_from_metadata(staging, environment, &metadata).await
+}
+
+async fn install_copilot_from_metadata(
+    staging: &Path,
+    environment: &BTreeMap<String, String>,
+    metadata: &serde_json::Value,
+) -> Result<()> {
+    use crate::harness_runtime::COPILOT_VERSION;
+    anyhow::ensure!(
+        metadata["version"] == COPILOT_VERSION,
+        "Copilot CLI download metadata does not match the managed runtime pin"
+    );
+    let key = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
+    let platform = metadata["platforms"]
+        .get(&key)
+        .with_context(|| format!("Copilot CLI does not have a managed runtime for {key}"))?;
+    let field = |name: &str| {
+        platform[name]
+            .as_str()
+            .with_context(|| format!("missing Copilot CLI artifact field {name}"))
+    };
+    let filename = field("filename")?;
+    let url = format!(
+        "{}/v{COPILOT_VERSION}/{filename}",
+        copilot_artifact_base(environment).trim_end_matches('/')
+    );
+    let archive = staging.join(filename);
+    download_verified_async(&url, &archive, field("sha256")?, environment).await?;
+    let bin = staging.join("bin");
+    std::fs::create_dir_all(&bin)?;
+    let entrypoint = bin.join("copilot");
+    let archive_for_extract = archive.clone();
+    let entrypoint_for_extract = entrypoint.clone();
+    tokio::task::spawn_blocking(move || {
+        extract_archive_file(
+            &archive_for_extract,
+            Path::new("copilot"),
+            &entrypoint_for_extract,
+        )
+    })
+    .await
+    .context("Copilot CLI extraction task failed")??;
+    std::fs::remove_file(&archive)?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&entrypoint, std::fs::Permissions::from_mode(0o755))?;
+    Ok(())
+}
+
+fn copilot_artifact_base(environment: &BTreeMap<String, String>) -> String {
+    #[cfg(test)]
+    if let Some(base) = environment.get("MJ_TEST_COPILOT_ARTIFACT_BASE") {
+        return base.clone();
+    }
+    #[cfg(not(test))]
+    let _ = environment;
+    "https://github.com/github/copilot-cli/releases/download".to_owned()
 }
 
 fn extract_zstd_file(archive: &Path, destination: &Path) -> Result<()> {

@@ -770,6 +770,16 @@ impl PlanProbe {
                 ]}
             ));
         }
+        // Copilot CLI carries its approval policy on its `allow_all` selector.
+        if harness == HarnessKind::Copilot {
+            options.as_array_mut().unwrap().push(json!(
+                {"id": "allow_all", "name": "Allow All", "type": "select", "category": "permissions",
+                 "currentValue": "off", "options": [
+                    {"value": "on", "name": "On"},
+                    {"value": "off", "name": "Off"}
+                ]}
+            ));
+        }
         let new = probe.message().await;
         assert_eq!(new["method"], "session/new");
         probe

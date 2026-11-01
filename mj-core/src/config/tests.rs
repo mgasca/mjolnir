@@ -893,11 +893,11 @@ fn every_harness_is_pointed_at_its_staged_home() {
     }
 }
 
-/// Commands that act on the person's own profile home leave Claude's variable
-/// unset on macOS, where the login lives in the Keychain, and set it
-/// everywhere else.
+/// Commands that act on the person's own profile home leave Claude's and
+/// Copilot's variables unset on macOS, where their logins live in the
+/// Keychain, and set them everywhere else.
 #[test]
-fn only_claude_on_macos_keeps_its_own_home_for_profile_commands() {
+fn only_keychain_logins_on_macos_keep_their_own_home_for_profile_commands() {
     let home = Path::new("/home/me/.claude-work");
 
     let mut mac = BTreeMap::new();
@@ -917,7 +917,7 @@ fn only_claude_on_macos_keeps_its_own_home_for_profile_commands() {
         );
         assert_eq!(
             environment.contains_key(kind.home_env()),
-            kind != HarnessKind::Claude,
+            !matches!(kind, HarnessKind::Claude | HarnessKind::Copilot),
             "{kind:?}"
         );
     }

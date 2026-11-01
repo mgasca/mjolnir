@@ -1815,6 +1815,32 @@ async fn prepare_and_start_harness(
             .await?;
             true
         }
+        HarnessKind::Copilot if subagent_role.is_some() => {
+            let budget = preparation_step(
+                root,
+                status,
+                "harness-profile",
+                LOCAL_PREPARATION_STEP_TIMEOUT,
+                cancel,
+            )
+            .await?;
+            let home = credentials
+                .as_ref()
+                .map_err(|message| anyhow::anyhow!("{message}"))?
+                .home
+                .clone();
+            let root = root.to_owned();
+            let session_id = config.session_id.clone();
+            let role = subagent_role.context("Copilot CLI session has no MCP role")?;
+            bounded_blocking_preparation_step(&budget, cancel, move |step_cancel| {
+                if step_cancel.is_cancelled() {
+                    bail!("preparation cancelled before configuring the Copilot CLI profile");
+                }
+                super::subagents::configure_copilot_subagent_mcp(&root, &session_id, &home, role)
+            })
+            .await?;
+            true
+        }
         _ => false,
     };
     {

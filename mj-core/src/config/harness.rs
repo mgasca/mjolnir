@@ -19,6 +19,7 @@ pub enum HarnessKind {
     Muse,
     OpenCode,
     Dsh,
+    Copilot,
 }
 
 /// The operating system of the machine a harness's own CLI runs on, as far as
@@ -343,6 +344,12 @@ impl HarnessKind {
             self.home_env().into(),
             crate::target_path::text(config_root),
         );
+        if self == Self::Copilot {
+            // A standalone Copilot CLI downloads newer versions in the
+            // background and runs them on its next launch, which would replace
+            // the pinned binary Mjolnir installed.
+            environment.insert("COPILOT_AUTO_UPDATE".into(), "false".into());
+        }
         if self == Self::Kimi {
             // Kimi treats a session lock recorded under another hostname, or
             // under a live process with the recorded PID, as held forever.
@@ -455,7 +462,10 @@ impl HarnessKind {
     /// [`HarnessKind::login_store`] is the one place that turns this into a
     /// location; ask it, not this, where a login is.
     pub const fn keeps_login_in_home(self, host: HarnessHost) -> bool {
-        !matches!((self, host), (Self::Claude, HarnessHost::MacOs))
+        !matches!(
+            (self, host),
+            (Self::Claude | Self::Copilot, HarnessHost::MacOs)
+        )
     }
 
     /// Where the login of the profile with home `home` lives on `host`. This
@@ -486,7 +496,7 @@ impl HarnessKind {
         }
     }
 
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Codex,
         Self::Claude,
         Self::Kimi,
@@ -494,6 +504,7 @@ impl HarnessKind {
         Self::Muse,
         Self::OpenCode,
         Self::Dsh,
+        Self::Copilot,
     ];
 
     /// Environment variable used to isolate this harness's configuration.
@@ -509,6 +520,10 @@ impl HarnessKind {
             // sessions and would otherwise default to `.dsh-acp` inside the
             // directory it runs in.
             Self::Dsh => "DSH_ACP_DATA_DIR",
+            // Copilot CLI's configuration, login (where no OS keychain
+            // exists), MCP servers, skills and session state all live under
+            // this one directory.
+            Self::Copilot => "COPILOT_HOME",
         }
     }
 
@@ -527,6 +542,7 @@ impl HarnessKind {
             // serves a session is installed on demand and proves nothing
             // about one.
             Self::Dsh => ".dsh",
+            Self::Copilot => ".copilot",
         }
     }
 
@@ -550,6 +566,13 @@ impl HarnessKind {
             // authenticates with an API key and nothing that decides a login
             // reads this. No dsh-acp release writes the file.
             Self::Dsh => "auth.json",
+            // Copilot CLI keeps its login in `config.json` when the host has
+            // no OS keychain, under `authTokens`
+            // ([`crate::credentials::copilot_config_has_login`]). The file
+            // also exists, without a login, from the first launch on, and it
+            // starts with `//` comment lines before its JSON object
+            // ([`crate::credentials::credential_json`]).
+            Self::Copilot => "config.json",
         }
     }
 
@@ -567,9 +590,31 @@ impl HarnessKind {
     pub const fn api_key_variable(self) -> Option<&'static str> {
         match self {
             Self::Dsh => Some("DEEPSEEK_API_KEY"),
-            Self::Codex | Self::Claude | Self::Kimi | Self::Grok | Self::Muse | Self::OpenCode => {
+            Self::Codex | Self::Claude | Self::Kimi | Self::Grok | Self::Muse | Self::OpenCode | Self::Copilot => {
                 None
             }
+            
+    /// A variable this harness accepts a token from instead of its own
+    /// login. A profile that names it in `environment` authenticates with
+    /// [`AuthScheme::ApiKey`]; one that does not uses the harness's login.
+    ///
+    /// Copilot CLI reads `COPILOT_GITHUB_TOKEN` (a fine-grained personal
+    /// access token with the "Copilot Requests" permission, or a GitHub OAuth
+    /// token) ahead of its stored login. It also reads `GH_TOKEN` and
+    /// `GITHUB_TOKEN`, which the worker strips from every harness: inside a
+    /// session those name the session's own GitHub App token, which Copilot
+    /// cannot use.
+    pub const fn optional_token_variable(self) -> Option<&'static str> {
+        match self {
+            Self::Copilot => Some("COPILOT_GITHUB_TOKEN"),
+            Self::Codex
+            | Self::Claude
+            | Self::Kimi
+            | Self::Grok
+            | Self::Muse
+            | Self::OpenCode
+            | Self::Mimo
+            | Self::Dsh => None,
         }
     }
 
@@ -586,6 +631,19 @@ impl HarnessKind {
                 (
                     "DSH_ACP_PERMISSION_MODE",
                     "the target's permission mode decides it",
+                ),
+            ],
+            // Copilot's launch-time allow-all baseline survives turning the
+            // `allow_all` option off, so a profile cannot be allowed to set it;
+            // auto-update would replace the pinned binary under Mjolnir.
+            Self::Copilot => &[
+                (
+                    "COPILOT_ALLOW_ALL",
+                    "the target's permission mode decides it",
+                ),
+                (
+                    "COPILOT_AUTO_UPDATE",
+                    "Mjolnir pins the Copilot CLI version it runs",
                 ),
             ],
             Self::Codex | Self::Claude | Self::Kimi | Self::Grok | Self::Muse | Self::OpenCode => {
@@ -620,6 +678,7 @@ impl HarnessKind {
             // serve sessions: a machine carrying the bridge but no DeepSeek
             // installation has nothing to detect.
             Self::Dsh => "dsh",
+            Self::Copilot => "copilot",
         }
     }
 
@@ -627,6 +686,9 @@ impl HarnessKind {
     pub const fn agent_instructions_file(self) -> &'static str {
         match self {
             Self::Claude => "CLAUDE.md",
+            // Copilot CLI's personal instructions, read from its home; it
+            // reads a workspace's `AGENTS.md` itself.
+            Self::Copilot => "copilot-instructions.md",
             // dsh-acp reads AGENTS.md from its data directory and workspace
             // roots ([`crate::harness_runtime::dsh_acp_script`]).
             Self::Codex | Self::Kimi | Self::Grok | Self::Muse | Self::OpenCode | Self::Dsh => {
@@ -649,7 +711,8 @@ impl HarnessKind {
             | Self::Grok
             | Self::Muse
             | Self::OpenCode
-            | Self::Dsh => &["skills"],
+            | Self::Dsh 
+            | Self::Copilot => &["skills"],
         }
     }
 
@@ -671,7 +734,7 @@ impl HarnessKind {
         match self {
             Self::Claude => &["skills/synced", "skills/.trash"],
             Self::Codex => &["skills/.system"],
-            Self::Kimi | Self::Grok | Self::Muse | Self::OpenCode | Self::Dsh => &[],
+            Self::Kimi | Self::Grok | Self::Muse | Self::OpenCode | Self::Dsh | Self::Copilot => &[],
         }
     }
 
@@ -685,6 +748,7 @@ impl HarnessKind {
             Self::Muse => "muse",
             Self::OpenCode => "opencode",
             Self::Dsh => "dsh",
+            Self::Copilot => "copilot",
         }
     }
 
@@ -698,6 +762,7 @@ impl HarnessKind {
             Self::Muse => "Muse Code",
             Self::OpenCode => "OpenCode",
             Self::Dsh => "DSH",
+            Self::Copilot => "Copilot CLI",
         }
     }
 
@@ -712,6 +777,7 @@ impl HarnessKind {
             }
             Self::Claude => "Install it with `npm install -g @anthropic-ai/claude-code`".to_owned(),
             Self::Dsh => "Install it with `npm install -g @brokkai/dsh-acp` (Node.js 22 or newer), or from a release archive at https://github.com/BrokkAi/dsh-acp/releases".to_owned(),
+            Self::Copilot => "Install it with `npm install -g @github/copilot` (Node.js 22 or newer), `brew install --cask copilot-cli`, or `winget install GitHub.Copilot`".to_owned(),
             other => format!("Install the {} CLI", other.display_name()),
         }
     }
@@ -844,6 +910,21 @@ impl HarnessKind {
                 session_sandbox: None,
                 staged_setting: None,
             }),
+            // Copilot CLI decides approvals per session through its
+            // `allow_all` option, which `session/load` keeps, so the policy is
+            // selected on every open. `off` sends every write, command and URL
+            // fetch to Hel as a permission request.
+            (Self::Copilot, ExecutionPolicy::ConfiguredApprovals) => Some(ExecutionEnforcement {
+                label: "allow-all-off",
+                acp_mode: None,
+                acp_mode_selector: None,
+                acp_setting: Some(("allow_all", "off")),
+                launch_flag: None,
+                launch_environment: None,
+                launch_argument: None,
+                session_sandbox: None,
+                staged_setting: None,
+            }),
             // Every remaining harness keeps the configuration its user wrote.
             (_, ExecutionPolicy::ConfiguredApprovals) => None,
             (Self::Claude, ExecutionPolicy::Unconstrained) => Some(ExecutionEnforcement {
@@ -903,6 +984,20 @@ impl HarnessKind {
                 acp_mode: None,
                 acp_mode_selector: None,
                 acp_setting: Some(("permission_mode", "allow")),
+                launch_flag: None,
+                launch_environment: None,
+                launch_argument: None,
+                session_sandbox: None,
+                staged_setting: None,
+            }),
+            // Copilot's command sandbox stays off (it is off by default and
+            // needs bubblewrap with network namespaces on Linux); `on`
+            // approves every tool, path and URL without asking.
+            (Self::Copilot, ExecutionPolicy::Unconstrained) => Some(ExecutionEnforcement {
+                label: "allow-all-on",
+                acp_mode: None,
+                acp_mode_selector: None,
+                acp_setting: Some(("allow_all", "on")),
                 launch_flag: None,
                 launch_environment: None,
                 launch_argument: None,
@@ -1038,6 +1133,9 @@ impl HarnessKind {
         match self {
             Self::Claude => Some(".claude.json"),
             Self::Kimi => Some("mcp.json"),
+            // Copilot accepts only HTTP and SSE servers over ACP; stdio
+            // servers come from this file.
+            Self::Copilot => Some("mcp-config.json"),
             Self::Codex | Self::Grok | Self::Muse | Self::OpenCode | Self::Dsh => None,
         }
     }
@@ -1051,7 +1149,7 @@ impl HarnessKind {
     pub const fn supports_delegation_tools(self) -> bool {
         matches!(
             self,
-            Self::Claude | Self::Codex | Self::Dsh | Self::OpenCode
+            Self::Claude | Self::Codex | Self::Dsh | Self::OpenCode | Self::Copilot
         )
     }
 
@@ -1081,6 +1179,7 @@ impl HarnessKind {
             Self::Muse => &[".data/muse/sessions"],
             Self::OpenCode => &[".data/opencode"],
             Self::Dsh => &["sessions"],
+            Self::Copilot => &["session-state"],
         }
     }
 
@@ -1098,7 +1197,7 @@ impl HarnessKind {
         match self {
             Self::Grok => Some("bin/agent"),
             Self::Claude => Some("node_modules/.bin/claude"),
-            Self::Codex | Self::Kimi | Self::Muse | Self::OpenCode | Self::Dsh => None,
+            Self::Codex | Self::Kimi | Self::Muse | Self::OpenCode | Self::Dsh | Self::Copilot => None,
         }
     }
 
@@ -1111,6 +1210,7 @@ impl HarnessKind {
             Self::Kimi => vec!["acp"],
             Self::Grok => ["agent"].into_iter().chain(flag).chain(["stdio"]).collect(),
             Self::OpenCode => vec!["acp"],
+            Self::Copilot => vec!["--acp"],
         }
     }
 }
@@ -1417,11 +1517,29 @@ impl HarnessProfile {
     /// `InlineApiKey` is a custom provider that writes its key into its own
     /// `config.toml`; that file is copied into the staged home, so the profile
     /// is just as set up as an `env_key` one and needs no interactive login.
+    /// The token variable this profile names in its `environment`, when its
+    /// harness accepts one in place of its login
+    /// ([`HarnessKind::optional_token_variable`]). The entry as written
+    /// counts, so a secret reference that did not resolve still selects the
+    /// token scheme and is reported by [`Self::ensure_ready`].
+    fn optional_token_key(&self) -> Option<&'static str> {
+        let env_key = self.kind.optional_token_variable()?;
+        self.environment
+            .sources()
+            .contains_key(env_key)
+            .then_some(env_key)
+    }
+
     pub fn auth_scheme(&self) -> AuthScheme {
         if self.kind.keeps_logins_in_database() {
             return AuthScheme::NativeLoginStore;
         }
         if let Some(env_key) = self.kind.api_key_variable() {
+            return AuthScheme::ApiKey {
+                env_key: env_key.to_owned(),
+            };
+        }
+        if let Some(env_key) = self.optional_token_key() {
             return AuthScheme::ApiKey {
                 env_key: env_key.to_owned(),
             };
@@ -1490,8 +1608,12 @@ impl HarnessProfile {
     pub fn authentication_marker(&self) -> PathBuf {
         match self.auth_scheme() {
             // A harness that reads its key from its environment keeps no file
-            // that proves it; its kind's marker names where one would be.
-            AuthScheme::ApiKey { .. } if self.kind.api_key_variable().is_some() => {
+            // that proves it; its kind's marker names where one would be. The
+            // same holds for a token supplied in place of the harness's login.
+            AuthScheme::ApiKey { .. }
+                if self.kind.api_key_variable().is_some()
+                    || self.kind.optional_token_variable().is_some() =>
+            {
                 harness_authentication_marker(self.kind, &self.home)
             }
             AuthScheme::ApiKey { .. }
@@ -1636,7 +1758,11 @@ impl HarnessProfile {
             self.resolve_dsh_key();
             return;
         }
-        if let Some(env_key) = self.kind.api_key_variable() {
+        if let Some(env_key) = self
+            .kind
+            .api_key_variable()
+            .or(self.kind.optional_token_variable())
+        {
             self.environment.inherit(env_key);
             return;
         }
@@ -1749,7 +1875,7 @@ impl HarnessProfile {
         let ready = || -> Result<()> {
             self.environment.ensure_resolved()?;
             let provider = self.codex_provider()?;
-            let api_key = match self.kind.api_key_variable() {
+            let api_key = match self.kind.api_key_variable().or(self.optional_token_key()) {
                 Some(env_key) => Some((self.kind.display_name().to_owned(), env_key)),
                 None => provider
                     .as_ref()

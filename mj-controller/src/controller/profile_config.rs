@@ -80,7 +80,7 @@ pub async fn validate_session_subagent_policy(
         .kind;
     if !kind.supports_delegation_tools() && !policy.is_native() {
         return Err(refuse(format!(
-            "{} sessions use their harness's own delegation; Mjolnir sub-agents and the None choice need a Claude, Codex, DSH, or OpenCode profile",
+            "{} sessions use their harness's own delegation; Mjolnir sub-agents and the None choice need a Claude, Codex, DSH, Copilot or OpenCode profile",
             kind.display_name()
         )));
     }
@@ -1625,7 +1625,7 @@ mod tests {
                 assert!(
                     refusal
                         .message()
-                        .contains("Claude, Codex, DSH, or OpenCode")
+                        .contains("Claude, Codex, DSH, or Copilot CLI")
                 );
             }
             // Native keeps a harness's own sub-agents; DSH has none, so an

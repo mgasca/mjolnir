@@ -62,6 +62,7 @@ controls:
 | Muse Code | the `:ask-me` permission profile in its staged settings, `allowAll` approvals with auto-review off, and `--disable-sandbox` (no permission checks; set `muse_auto_review = true` on the profile to restore the reviewer, which can still deny) |
 | OpenCode | `"permission": "allow"` in the staged `opencode.json` |
 | DSH | dsh-acp's `permission_mode` `allow`, selected on every session open |
+| Copilot CLI | its `allow_all` option `on`, selected on every session open |
 
 Kimi's mode is named `auto`, but in this context it approves every call. It is
 not a low-risk guardian policy.
@@ -81,7 +82,9 @@ states that its permission system is not a sandbox. DSH
 under configured approvals selects dsh-acp's `permission_mode` `ask`, so every
 write, command, and MCP tool call asks first, but it has no sandbox either:
 commands run directly on the host, and only its file tools are confined to the
-workspace roots.
+workspace roots. Copilot CLI under configured approvals selects its `allow_all`
+option `off`, so every tool, path outside the workspace, and URL asks first;
+Mjolnir leaves its optional command sandbox off.
 The dashboard's new-session and resume wizards warn when a harness without
 guardian support is paired with a raw target; `mj new`, the API, and the web
 viewer do not. A warning is not a sandbox either way—choose a container or
@@ -175,6 +178,7 @@ home from a harness-specific allowlist:
 | Muse Code | Authentication, settings, trust configuration, instructions, skills, and rules |
 | OpenCode | Authentication, configuration, instructions, and skills |
 | DSH | Instructions and skills (which DSH does not read); its API key reaches the session through the environment, not a file |
+| Copilot CLI | Authentication and managed state (`config.json`), settings, MCP config, instructions, and skills |
 
 Symbolic links inside an allowlisted profile entry are followed: the session
 receives the contents of the file or directory a link points to, even when the

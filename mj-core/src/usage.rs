@@ -52,6 +52,10 @@ impl TokenUsage {
             (_, Some("turn")) => UsageScope::Turn,
             (_, Some(_)) => UsageScope::Unspecified,
             (HarnessKind::Claude, None) => UsageScope::Turn,
+            // Copilot CLI reports the turn's model calls summed on the prompt
+            // response, as ACP defines the field (a turn of two tool calls
+            // reported both requests' tokens, verified against its debug log).
+            (HarnessKind::Copilot, None) => UsageScope::Turn,
             _ => UsageScope::Unspecified,
         };
         Self {

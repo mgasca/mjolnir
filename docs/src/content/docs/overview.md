@@ -98,13 +98,14 @@ These are the integrations shipped with Mjolnir 2.x today:
 | Muse Code | `muse` | Yes | Yes | Yes | No |
 | OpenCode | `opencode` | Yes | No | Yes | No |
 | DSH | `dsh` | API key | No (usage-priced, shows `API`) | Yes | No |
+| Copilot CLI | `copilot` | Yes | No | Yes | No |
 
 “Native state” means Mjolnir can resume the harness's own session when the
 same harness is selected again. A cross-harness resume instead restores the
 workspace and supplies a size-bounded handoff derived from the canonical
 transcript. See [Durability and recovery](/durability/).
 
-Kimi Code does not provide a guardian approval mode, and OpenCode and DSH run
+Kimi Code does not provide a guardian approval mode, OpenCode, Copilot and DSH run
 commands on the host without a sandbox. None of them should be used on a bare,
 unsandboxed runtime. Muse Code currently accepts one workspace root, so use
 either a one-repository bundle or one bare project directory, without attached

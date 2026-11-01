@@ -93,7 +93,8 @@ The unconstrained translation is Codex `agent-full-access`, Claude Code
 `bypassPermissions` with its sandbox disabled, Kimi Code `auto`, Grok Build
 always-approve with its sandbox disabled, and OpenCode
 `"permission": "allow"` in `opencode.json`. DSH selects dsh-acp's
-`permission_mode` `allow`. Those all approve every action;
+`permission_mode` `allow`, and Copilot CLI selects its `allow_all` option
+`on`. Those all approve every action;
 Kimi's mode happens to be named `auto` but is not a risk-selective guardian.
 Muse instead stages `:ask-me`, selects `allowAll` approvals, turns
 muse-acp's auto-review off, and disables only the sandbox
@@ -198,8 +199,8 @@ installs and reuses the exact harness version pinned by Mjolnir in the remote
 user's cache; DSH instead runs the host's own `dsh-acp` when it is 0.4.0 or
 newer, or the pinned npm package. Node-based harnesses reuse Node.js 22 or newer
 with npm and npx when already on the host; otherwise the worker downloads a
-checksum-verified pinned Node.js into the user cache. Kimi, Grok, Muse, and
-OpenCode also install from checksum-verified artifacts downloaded by Mjolnir;
+checksum-verified pinned Node.js into the user cache. Kimi, Grok, Muse,
+OpenCode, and Copilot CLI also install from checksum-verified artifacts downloaded by Mjolnir;
 they do not require `curl`, `tar`, or a shell-based vendor installer. DSH needs
 a current `dsh-acp` on `PATH` or the managed Node fallback. Mjolnir never uses
 sudo to add these prerequisites and does not fall back to another harness

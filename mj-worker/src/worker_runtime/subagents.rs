@@ -274,6 +274,50 @@ pub(super) fn configure_kimi_subagent_mcp(
     })
 }
 
+/// Copilot CLI accepts only HTTP and SSE MCP servers over ACP and reads its
+/// stdio ("local") servers from `mcp-config.json` in its home, so Mjolnir's
+/// server is registered there, in the shape `copilot mcp add` writes.
+pub(super) fn configure_copilot_subagent_mcp(
+    root: &Path,
+    session_id: &str,
+    home: &Path,
+    role: mj_core::subagent::SubagentMcpRole,
+) -> Result<()> {
+    let path = home.join("mcp-config.json");
+    anyhow::ensure!(
+        root.is_absolute()
+            && private_staged_home(root, session_id, home)
+            && regular_file_or_absent(&path),
+        "cannot register the Copilot CLI {} tools outside a private staged profile",
+        role.id(),
+    );
+    let command = root.join("hel");
+    let command = command
+        .to_str()
+        .context("Copilot CLI MCP command path is not UTF-8")?;
+    let socket = root.join(SUBAGENT_SOCKET);
+    let socket = socket
+        .to_str()
+        .context("Copilot CLI MCP socket path is not UTF-8")?;
+    edit_profile_json(&path, "staged Copilot CLI MCP configuration", |config| {
+        let servers = config
+            .entry("mcpServers")
+            .or_insert_with(|| serde_json::json!({}))
+            .as_object_mut()
+            .context("Copilot CLI mcpServers must be an object")?;
+        servers.insert(
+            mj_core::subagent::SUBAGENT_MCP_SERVER.into(),
+            serde_json::json!({
+                "type": "local",
+                "command": command,
+                "args": ["worker", "subagent-mcp", "--socket", socket, "--harness", "copilot", "--role", role.id()],
+                "tools": ["*"],
+            }),
+        );
+        Ok(())
+    })
+}
+
 /// Rewrite a staged profile's JSON file, writing only when its content changes.
 /// A missing file starts as an empty object.
 fn edit_profile_json(

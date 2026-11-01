@@ -80,6 +80,29 @@ fn grok_credentials(expiries: &[&str]) -> Vec<u8> {
     serde_json::to_vec(&serde_json::Value::Object(grants)).unwrap()
 }
 
+/// Copilot CLI's `config.json` as `copilot login` writes it on a host without
+/// an OS keychain: two `//` comment lines, then the JSON object. Without a
+/// login the object holds only `firstLaunchAt`.
+fn copilot_config(logged_in: bool) -> Vec<u8> {
+    let body = if logged_in {
+        serde_json::json!({
+            "authTokens": {
+                "https://github.com:octocat:github": {"token": "gho_token"},
+                "https://github.com:octocat": {"token": "gho_token"}
+            },
+            "loggedInUsers": [{"host": "https://github.com", "login": "octocat", "kind": "githubDotCom"}],
+            "lastLoggedInUser": {"host": "https://github.com", "login": "octocat"}
+        })
+    } else {
+        serde_json::json!({"firstLaunchAt": "2026-11-01T14:57:55.887Z"})
+    };
+    format!(
+        "// User settings belong in settings.json.\n// This file is managed automatically.\n{}\n",
+        serde_json::to_string_pretty(&body).unwrap()
+    )
+    .into_bytes()
+}
+
 fn snapshot(fingerprint: &str, freshness: Option<i64>) -> CredentialSnapshot {
     CredentialSnapshot {
         present: true,
@@ -164,6 +187,14 @@ fn every_harness_reports_expiry_only_where_hel_can_refresh_ahead_of_it() {
         (
             HarnessKind::Dsh,
             claude_credentials(1_755_000_000_000),
+            None,
+            None,
+        ),
+        // Copilot's `config.json` opens with comment lines and records a
+        // token without refresh or expiry, so it orders nothing either.
+        (
+            HarnessKind::Copilot,
+            copilot_config(true),
             None,
             None,
         ),

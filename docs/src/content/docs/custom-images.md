@@ -42,7 +42,7 @@ deliver only part of an equivalent environment setting.
 ## ACP bridges
 
 For each harness, Mjolnir first looks for an image-baked bridge binary on
-`PATH`: `codex-acp`, `claude-agent-acp`, `kimi`, `grok`, `opencode`, or `dsh-acp`. If it doesn't find
+`PATH`: `codex-acp`, `claude-agent-acp`, `kimi`, `grok`, `opencode`, `copilot` or `dsh-acp`. If it doesn't find
 one, the worker installs Mjolnir's exact pinned artifact into a leased cache.
 Codex and Claude Code use `npm ci`; the other harnesses use their direct
 artifacts or pinned packages. Mjolnir reuses Node.js 22+ with npm and npx from

@@ -566,7 +566,7 @@ fn move_preflight_rejects_invalid_destination_before_source_mutation() {
                 additional_mounts: None,
                 resource_allocation: None,
             },
-            "need a Claude, Codex, DSH, or OpenCode profile",
+            "need a Claude, Codex, DSH, Copilot or OpenCode profile",
         ),
         (
             "unconfigured Mjolnir delegation",

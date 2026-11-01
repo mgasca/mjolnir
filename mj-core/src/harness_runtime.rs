@@ -126,6 +126,9 @@ pub const MUSE_VERSION: &str = "1.4.14-R7309.1";
 pub const OPENCODE_VERSION: &str = "2.2.6";
 pub const DSH_ACP_VERSION: &str = "0.5.0";
 pub const DSH_ACP_PACKAGE: &str = "@brokkai/dsh-acp";
+/// The GitHub Copilot CLI release (https://github.com/github/copilot-cli)
+/// whose per-platform archives `mj-core/assets/copilot/runtime.json` pins.
+pub const COPILOT_VERSION: &str = "1.0.105";
 
 /// The shell commands that start OpenCode's ACP server with the executable
 /// named by `$opencode`, for the managed install and the container fallback
@@ -333,6 +336,18 @@ pub fn fallback_launch(
             "sh".into(),
             vec!["-c".into(), dsh_acp_launch_script()],
         ),
+        HarnessKind::Copilot => {
+            let acp = harness.bridge_args(policy).join(" ");
+            (
+                "sh".into(),
+                vec![
+                    "-c".into(),
+                    format!(
+                        "if command -v copilot >/dev/null 2>&1; then exec copilot {acp}; else echo 'Mjolnir needs compatible Copilot CLI on PATH or a Mjolnir-managed installation' >&2; exit 127; fi"
+                    ),
+                ],
+            )
+        }
     }
 }
 
@@ -499,6 +514,12 @@ pub const fn pin(kind: HarnessKind) -> HarnessPin {
             display_version: "dsh-acp 0.5.0",
             entrypoint: "dsh-acp",
             cli_entrypoint: "dsh-acp",
+        },
+        HarnessKind::Copilot => HarnessPin {
+            install_id: "copilot-1.0.105",
+            display_version: "Copilot CLI 1.0.105",
+            entrypoint: "bin/copilot",
+            cli_entrypoint: "bin/copilot",
         },
     }
 }

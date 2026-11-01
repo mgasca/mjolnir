@@ -485,13 +485,14 @@ pub fn error_reports_missing_native_session(
                         })
                     })
             }),
-        // dsh-acp writes a session's record at `session/new`, before its
-        // first prompt, so a missing one is a real failure.
+        // dsh-acp and Copilot CLI write a session's record at `session/new`,
+        // before its first prompt, so a missing one is a real failure.
         HarnessKind::Kimi
         | HarnessKind::Grok
         | HarnessKind::Muse
         | HarnessKind::OpenCode
-        | HarnessKind::Dsh => false,
+        | HarnessKind::Dsh
+        | HarnessKind::Copilot => false,
     }
 }
 

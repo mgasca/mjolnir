@@ -48,6 +48,7 @@ pub(super) const fn tool_name(kind: HarnessKind) -> &'static str {
         HarnessKind::Muse => "muse",
         HarnessKind::OpenCode => "opencode",
         HarnessKind::Dsh => "dsh",
+        HarnessKind::Copilot => "copilot",
     }
 }
 
@@ -71,6 +72,8 @@ fn adapted_tool_name(kind: HarnessKind) -> Option<&'static str> {
         HarnessKind::OpenCode => None,
         // No adapter reads dsh-acp's session records yet.
         HarnessKind::Dsh => None,
+        // Copilot CLI's `session-state/<id>/events.jsonl` has no adapter yet.
+        HarnessKind::Copilot => None,
     }
 }
 

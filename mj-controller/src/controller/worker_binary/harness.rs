@@ -192,6 +192,12 @@ pub(super) fn profile_configuration_paths(harness: HarnessKind) -> Vec<&'static 
         // dsh-acp keeps no configuration or login of its own; only the
         // instruction file and skills tree below are staged.
         mj_core::config::HarnessKind::Dsh => &[],
+        // Copilot CLI's login (where no OS keychain holds it) and managed
+        // state, the person's settings, and their MCP servers. Session state,
+        // logs, locks and installed plugins stay behind.
+        mj_core::config::HarnessKind::Copilot => {
+            &["config.json", "settings.json", "mcp-config.json"]
+        }
     };
     harness_files
         .iter()

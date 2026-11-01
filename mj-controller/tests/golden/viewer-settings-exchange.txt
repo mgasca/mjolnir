@@ -285,6 +285,10 @@
                   {
                     "value": "dsh",
                     "label": "DSH"
+                  },
+                  {
+                    "value": "copilot",
+                    "label": "Copilot CLI"
                   }
                 ]
               },

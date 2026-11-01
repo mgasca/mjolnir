@@ -446,6 +446,16 @@ fn harness_is_authenticated_with(
     ) {
         return claude_keychain_reports_authenticated(executor);
     }
+    // Copilot CLI's `config.json` exists from its first launch on, so only
+    // a stored login inside it counts; on macOS the login is in the Keychain
+    // instead, shared by every home, like Claude's.
+    if kind == HarnessKind::Copilot {
+        let stored = std::fs::read(profile.authentication_marker())
+            .is_ok_and(|bytes| mj_core::credentials::copilot_config_has_login(&bytes));
+        return stored
+            || (!kind.keeps_login_in_home(HarnessHost::current())
+                && copilot_keychain_reports_authenticated(executor));
+    }
     if profile.authentication_marker().is_file()
         || (kind == HarnessKind::Kimi && home.join("credentials").is_file())
     {
@@ -587,6 +597,27 @@ pub(crate) fn claude_keychain_credentials(
     })
 }
 
+/// Whether the macOS Keychain holds a Copilot CLI login. `copilot login`
+/// stores its OAuth token under the service name `copilot-cli`, whatever
+/// `COPILOT_HOME` says.
+#[cfg(target_os = "macos")]
+fn copilot_keychain_reports_authenticated(executor: &impl CommandExecutor) -> bool {
+    let command = CommandSpec::new(
+        "security",
+        ["find-generic-password", "-s", "copilot-cli", "-w"],
+    )
+    .purpose("read Copilot CLI authentication from the macOS Keychain");
+    executor
+        .execute(&command)
+        .is_ok_and(|output| output.status == 0 && !output.stdout.trim_ascii().is_empty())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn copilot_keychain_reports_authenticated(_executor: &impl CommandExecutor) -> bool {
+    false
+}
+
+#[cfg(any(target_os = "macos", test))]
 fn claude_credentials_contain_login(credentials: &[u8]) -> bool {
     let Ok(document) = serde_json::from_slice::<serde_json::Value>(credentials) else {
         return false;

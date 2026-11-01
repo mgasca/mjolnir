@@ -1063,6 +1063,9 @@ async fn refresh_profile_with_cache_root(
         }),
         // dsh-acp talks to DeepSeek's API, which bills by usage.
         HarnessKind::Dsh => Ok(usage_priced()),
+        // Copilot CLI shows its premium-request allowance only inside an
+        // interactive session (`/usage`); no non-interactive read exists.
+        HarnessKind::Copilot => Ok(not_reported()),
     };
     let report = result.unwrap_or_else(|error| ProfileQuota {
         paid_credits: None,

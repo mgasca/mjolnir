@@ -743,6 +743,7 @@ mod tests {
             HarnessKind::Claude,
             HarnessKind::Codex,
             HarnessKind::Dsh,
+            HarnessKind::Copilot,
             HarnessKind::Muse,
             // Delegates through Mjolnir but has no push review gate.
             HarnessKind::OpenCode,

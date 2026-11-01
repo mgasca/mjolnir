@@ -2004,6 +2004,7 @@ mod tests {
             crate::config::HarnessKind::Codex,
             crate::config::HarnessKind::Dsh,
             crate::config::HarnessKind::OpenCode,
+            crate::config::HarnessKind::Copilot,
         ] {
             for policy in [
                 SubagentPolicy::Native,

@@ -720,6 +720,8 @@ Most behavior belongs in [configuration](/configuration/). These environment var
 | `KIMI_CODE_HOME` | Kimi Code home used by setup discovery and native import. |
 | `GROK_HOME` | Grok Build home used by setup discovery and native import. |
 | `DSH_ACP_DATA_DIR` | DSH home used by setup discovery. |
+| `COPILOT_HOME` | Copilot CLI home used by setup discovery. |
+| `COPILOT_GITHUB_TOKEN` | A Copilot CLI token, passed to Copilot sessions in place of the profile home's login. |
 | `DEEPSEEK_API_KEY` | DSH's API key, passed to DSH sessions when DSH's own credentials hold none. It outranks the profile's `environment`. |
 | `XDG_CONFIG_HOME`, `XDG_DATA_HOME` | Muse configuration and external native session storage roots, respectively. |
 | `GH_TOKEN` / `GITHUB_TOKEN` | GitHub token available for syncing into every live target except a bare runtime on this machine. |

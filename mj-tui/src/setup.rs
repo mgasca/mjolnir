@@ -213,13 +213,14 @@ struct SetupSize {
     height: u16,
 }
 
-const MANAGED_SETUP_HARNESSES: [mj_core::config::HarnessKind; 6] = [
+const MANAGED_SETUP_HARNESSES: [mj_core::config::HarnessKind; 7] = [
     mj_core::config::HarnessKind::Codex,
     mj_core::config::HarnessKind::Claude,
     mj_core::config::HarnessKind::Kimi,
     mj_core::config::HarnessKind::Grok,
     mj_core::config::HarnessKind::Muse,
     mj_core::config::HarnessKind::OpenCode,
+    mj_core::config::HarnessKind::Copilot,
 ];
 
 /// A profile whose authentication obviously needs no interactive login,
