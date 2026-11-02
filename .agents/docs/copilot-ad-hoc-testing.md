@@ -12,9 +12,8 @@ what to look for, and where the evidence is.
   (debug is fine). Below, `MJ="target/debug/mj --instance copilot-test"`.
 - A GitHub account with Copilot. The Free and Pro plans expose one model
   (`gpt-6-luna` through Auto); Pro+, Business and Enterprise expose several.
-- A GitHub OAuth token. `gh auth token` prints the GitHub CLI's, which Copilot
-  accepts; a fine-grained personal access token needs the "Copilot Requests"
-  permission. Classic `ghp_` tokens are refused by Copilot.
+- A way to sign the test profile in. Either a token to paste (see "Getting
+  a token" below) or a browser on this machine for Copilot's own login flow.
 - A shell that is not pointed at the person's own instance. A shell opened
   inside a Mjolnir session (a coding agent's terminal, for example) inherits
   `MJ_CONFIG_DIR`, `MJ_DATA_DIR`, `MJ_SESSION_ID` and `MJ_SESSION_BASH_ENV`,
@@ -46,18 +45,69 @@ Create `~/.config/mjolnir/instances/copilot-test/config.toml`:
     kind = "copilot"
     home = "/path/to/copilot-test-home"
 
-Prepare the profile home. The simplest route on Linux, where no OS keychain
-exists, stores the token as a plaintext login in `config.json`; Copilot asks
-"Store token in plaintext config file? (y/N)" on a terminal:
+Prepare the profile home. Copilot CLI keeps its login in the OS keychain
+when there is one, and otherwise (Linux without a secret service, WSL) asks
+to store it as plaintext in `COPILOT_HOME/config.json`. Mjolnir stages that
+file into every session, so for this runbook the plaintext file is what you
+want on Linux. `copilot` in the commands below is any Copilot CLI 1.0.105:
+the managed one Mjolnir installs at
+`~/.cache/mjolnir/harnesses/copilot/copilot-1.0.105/bin/copilot` after the
+first discovery (scenario A), or `npx -y @github/copilot@1.0.105`, or a
+global `npm install -g @github/copilot@1.0.105`.
+
+Getting a token. Copilot accepts three kinds, and refuses classic `ghp_`
+personal access tokens:
+
+1. The GitHub CLI's own OAuth token, the quickest if `gh` is already signed
+   in on this machine (`gh auth status` says so; otherwise `gh auth login`
+   first). Print it and copy it to the clipboard in one step:
+
+       gh auth token | clip.exe        # WSL
+       gh auth token | pbcopy          # macOS
+       gh auth token | xclip -sel c    # Linux with X11
+
+   or just run `gh auth token` and copy the `gho_...` line it prints. It is
+   a credential for your account; do not paste it into a chat, a log or a
+   commit.
+2. A fine-grained personal access token from
+   https://github.com/settings/personal-access-tokens/new: resource owner
+   your own account, no repository access needed, and under "Account
+   permissions" grant "Copilot Requests". Copy it once at creation; GitHub
+   does not show it again.
+3. A token from Copilot's own login (option B below), which needs no copying.
+
+Option A, paste a token:
 
     mkdir -m 700 /path/to/copilot-test-home
-    COPILOT_HOME=/path/to/copilot-test-home copilot login --with-token   # paste the token, answer y
+    COPILOT_HOME=/path/to/copilot-test-home copilot login --with-token
 
-`copilot` here is any Copilot CLI 1.0.105, for example the managed one Mjolnir
-installs at `~/.cache/mjolnir/harnesses/copilot/copilot-1.0.105/bin/copilot`
-after the first discovery, or `npx -y @github/copilot@1.0.105`. Put a canary in
-`copilot-instructions.md` in that home, for example "When asked for the staged
-codeword, answer exactly STAGED-HOME-7731"; scenario D uses it.
+   Copilot prints "Paste your authentication token:"; paste it and press
+   Enter (nothing is echoed). It then asks "System keychain unavailable.
+   Store token in plaintext config file? (y/N)"; answer `y`. Expect "Signed in
+   successfully as <login>" and a `config.json` in the home containing
+   `authTokens`. Run it in a real terminal: the token prompt reads standard
+   input, but the y/N question needs a terminal, so piping the token in
+   (`gh auth token | copilot login --with-token`) logs in and then reports
+   "the token was not saved".
+
+Option B, Copilot's browser or device-code login, no token handling:
+
+    mkdir -m 700 /path/to/copilot-test-home
+    COPILOT_HOME=/path/to/copilot-test-home copilot login
+
+   On a desktop it opens the browser; over SSH it prints a device code to
+   enter at https://github.com/login/device. Answer `y` to the same plaintext
+   question. This is also what `mj login --profile copilot` runs for you once
+   the profile exists (scenario G), so you can skip preparing the login here
+   and sign in through Mjolnir instead.
+
+Either way, check the result without printing the token:
+
+    grep -c authTokens /path/to/copilot-test-home/config.json    # expect 1
+
+Put a canary in `copilot-instructions.md` in that home, for example "When
+asked for the staged codeword, answer exactly STAGED-HOME-7731"; scenario D
+uses it.
 
 Where things live afterwards: instance data under
 `~/.local/share/mjolnir/instances/copilot-test/`; per session,
