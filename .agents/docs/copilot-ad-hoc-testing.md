@@ -142,12 +142,28 @@ loudly; do not expect a fallback.
 
 ## B. First session and streamed reply
 
+A session needs a project directory that is a Git checkout. Make a scratch
+one so nothing has to be substituted; `COPILOT_TEST_PROJECT` is reused by the
+later scenarios:
+
+    export COPILOT_TEST_PROJECT=$HOME/copilot-test-project
+    mkdir -p "$COPILOT_TEST_PROJECT" && cd "$COPILOT_TEST_PROJECT" && git init -q -b main . && printf '# Scratch project\n' > README.md && printf 'def add(a, b):\n    return a + b\n' > calc.py && git add -A && git -c user.name=test -c user.email=test@example.com commit -qm 'Initial' && cd - >/dev/null
+    git -C "$COPILOT_TEST_PROJECT" log --oneline    # expect one commit
+
+Then create the workspace and the session. `mj new` prints the session id as
+JSON; the guard after it stops here when creation fails, instead of running
+the later commands with an empty id:
+
     $MJ workspaces create test --json
-    SID=$($MJ new --workspace test --profile copilot --target localhost \
-          --project-directory /path/to/a/git/checkout --json \
-          "Reply with exactly the word PONG and nothing else." | python3 -c 'import sys,json;print(json.load(sys.stdin)["session_id"])')
+    SID=$($MJ new --workspace test --profile copilot --target localhost --project-directory "$COPILOT_TEST_PROJECT" --json "Reply with exactly the word PONG and nothing else." | python3 -c 'import sys,json;print(json.load(sys.stdin)["session_id"])') && [ -n "$SID" ] && echo "session $SID" || echo "mj new failed; see the daemon log reference in the error above"
     $MJ wait --session $SID --timeout 240 --json
     $MJ transcript --session $SID
+
+If `mj new` answers a 500 with a daemon log reference, the reason is one line
+in the instance's daemon log:
+`grep <reference> ~/.local/share/mjolnir/instances/copilot-test/logs/mj-daemon-*.log`.
+"project directory does not exist or is not a directory" means the
+`--project-directory` path was not created or was mistyped.
 
 Expect `PONG` as an agent entry. In `workers/$SID/launch.json` the environment
 holds `COPILOT_HOME=<staged home>` and `COPILOT_AUTO_UPDATE=false`, and no
