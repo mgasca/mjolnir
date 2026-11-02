@@ -119,10 +119,17 @@ impl Controller {
             .with_context(|| format!("unknown target template {target_id:?}"))?;
         match target {
             TargetTemplate::LocalBare => {
-                ensure!(
-                    directory.is_dir(),
-                    "project directory does not exist or is not a directory"
-                );
+                // The caller named this path, so it is theirs to fix and safe
+                // to say back: a refusal, not an internal failure behind a
+                // daemon-log reference. The same kind the bare-SSH check
+                // answers for a missing remote directory.
+                if !directory.is_dir() {
+                    return Err(mj_core::refusal::Refusal::unusable(format!(
+                        "project directory does not exist or is not a directory: {}",
+                        directory.display()
+                    ))
+                    .into());
+                }
                 // This also accepts a plain folder, a repository without its
                 // first commit, and a host where Git is not installed.
                 Ok(

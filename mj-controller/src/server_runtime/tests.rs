@@ -286,6 +286,17 @@ fn new_preflight_rejects_a_bare_project_without_a_git_head() {
             .to_string()
             .contains("project directory does not exist or is not a directory")
     );
+    // Hard-won: Copilot runbook 2026-11-02: a mistyped --project-directory
+    // answered a 500 with a daemon-log reference instead of saying the
+    // directory does not exist.
+    let refusal = mj_core::refusal::Refusal::of(&error)
+        .expect("a path the caller named is theirs to fix, not an internal failure");
+    assert_eq!(refusal.kind(), mj_core::refusal::RefusalKind::Unusable);
+    assert!(
+        refusal.message().contains("/definitely/not/a/project"),
+        "the refusal names the path: {}",
+        refusal.message()
+    );
 }
 
 #[test]
