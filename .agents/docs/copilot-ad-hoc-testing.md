@@ -15,8 +15,23 @@ what to look for, and where the evidence is.
 - A GitHub OAuth token. `gh auth token` prints the GitHub CLI's, which Copilot
   accepts; a fine-grained personal access token needs the "Copilot Requests"
   permission. Classic `ghp_` tokens are refused by Copilot.
-- Inside a Mjolnir session, unset `MJ_CONFIG_DIR`, `MJ_DATA_DIR`,
-  `MJ_SESSION_ID` and `MJ_SESSION_BASH_ENV` first; they override `--instance`.
+- A shell that is not pointed at the person's own instance. A shell opened
+  inside a Mjolnir session (a coding agent's terminal, for example) inherits
+  `MJ_CONFIG_DIR`, `MJ_DATA_DIR`, `MJ_SESSION_ID` and `MJ_SESSION_BASH_ENV`,
+  and the first two override `--instance`, so every `mj` command below would
+  act on the live instance instead of the test one. Check and clear them at
+  the start of the shell, once:
+
+      env | grep '^MJ_'                                   # anything printed here must go
+      unset MJ_CONFIG_DIR MJ_DATA_DIR MJ_SESSION_ID MJ_SESSION_BASH_ENV
+      env | grep '^MJ_' || echo "no MJ_ variables; safe to use --instance"
+
+  `unset` affects only the current shell, so repeat it in every new terminal
+  or tmux window used for the test, or add it to the top of a test script.
+  Alternatively run each command with them removed:
+  `env -u MJ_CONFIG_DIR -u MJ_DATA_DIR -u MJ_SESSION_ID -u MJ_SESSION_BASH_ENV target/debug/mj --instance copilot-test ...`.
+  A plain terminal outside any session has none of these set and needs
+  nothing.
 
 ## Instance and profile home
 
