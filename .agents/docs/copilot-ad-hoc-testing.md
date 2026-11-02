@@ -105,9 +105,18 @@ Either way, check the result without printing the token:
 
     grep -c authTokens /path/to/copilot-test-home/config.json    # expect 1
 
-Put a canary in `copilot-instructions.md` in that home, for example "When
-asked for the staged codeword, answer exactly STAGED-HOME-7731"; scenario D
-uses it.
+Write the canary instruction scenario D checks. This overwrites any existing
+`copilot-instructions.md` in the home, so use it only on a test home. Copy and
+paste the whole block; it is plain `printf`, so it survives the indentation of
+this document:
+
+    export COPILOT_TEST_HOME=/path/to/copilot-test-home
+    printf '%s\n' '# Test instructions' 'When asked for the staged codeword, answer exactly STAGED-HOME-7731 and nothing else.' > "$COPILOT_TEST_HOME/copilot-instructions.md"
+    grep -c STAGED-HOME-7731 "$COPILOT_TEST_HOME/copilot-instructions.md"    # expect 1
+
+Do this before creating the session: staging copies the home when a session
+starts, so a session that is already running keeps the instructions it began
+with.
 
 Where things live afterwards: instance data under
 `~/.local/share/mjolnir/instances/copilot-test/`; per session,
@@ -171,8 +180,12 @@ directories") and URL fetches ask the same way.
 
 ## D. Personal instructions and skills
 
-Ask "What is the staged codeword?" and expect the canary from the profile
-home's `copilot-instructions.md`, which staging copied into the session home.
+Ask "What is the staged codeword?" and expect exactly `STAGED-HOME-7731`, the
+canary written into the profile home's `copilot-instructions.md` in the
+profile-home step, which staging copied into the session home. If it answers
+that it does not know, the file was written after the session started or into
+a different home than the profile's `home`; `diff` the profile copy against
+`workers/<session>/profile/copilot-instructions.md`.
 Put a skill at `<profile home>/skills/<name>/SKILL.md` and expect Copilot to
 list it on `/skill list` inside the TUI or use it when asked. Copilot also
 reads the workspace's own `AGENTS.md`; that is Copilot's behavior, not
