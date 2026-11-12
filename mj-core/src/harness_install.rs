@@ -244,6 +244,7 @@ fn image_programs(harness: HarnessKind) -> (&'static str, &'static str, &'static
         HarnessKind::Grok => ("grok", "grok", "grok"),
         HarnessKind::OpenCode => ("opencode", "opencode", "opencode"),
         HarnessKind::Dsh => ("dsh-acp", "dsh-acp", "dsh-acp"),
+        HarnessKind::Copilot => ("copilot", "copilot", "copilot"),
     }
 }
 
@@ -329,7 +330,7 @@ async fn locate_in_image(
                 ],
             )
         }
-        HarnessKind::Kimi | HarnessKind::Grok => (
+        HarnessKind::Kimi | HarnessKind::Grok | HarnessKind::Copilot => (
             bridge,
             harness
                 .bridge_args(execution_policy)
@@ -395,6 +396,7 @@ fn target_native_harness_is_available(
         HarnessKind::Kimi => "kimi",
         HarnessKind::Grok => "grok",
         HarnessKind::OpenCode => "opencode",
+        HarnessKind::Copilot => "copilot",
         HarnessKind::Codex | HarnessKind::Claude | HarnessKind::Muse | HarnessKind::Dsh => {
             return Ok(false);
         }
@@ -2511,14 +2513,19 @@ mod tests {
     #[test]
     fn ambient_native_launches_use_target_tools_and_keep_custom_commands() {
         let tools = tempfile::tempdir().unwrap();
-        for command in ["kimi", "grok", "opencode"] {
+        for command in ["kimi", "grok", "opencode", "copilot"] {
             crate::test_hooks::install_fake_command(tools.path(), command, "#!/bin/sh\nexit 0\n");
         }
         let environment = BTreeMap::from([(
             "PATH".to_owned(),
             tools.path().to_string_lossy().into_owned(),
         )]);
-        for harness in [HarnessKind::Kimi, HarnessKind::Grok, HarnessKind::OpenCode] {
+        for harness in [
+            HarnessKind::Kimi,
+            HarnessKind::Grok,
+            HarnessKind::OpenCode,
+            HarnessKind::Copilot,
+        ] {
             assert!(
                 target_native_harness_is_available(harness, &environment).unwrap(),
                 "{} should reuse its target-provided executable",

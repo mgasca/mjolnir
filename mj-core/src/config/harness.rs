@@ -590,10 +590,16 @@ impl HarnessKind {
     pub const fn api_key_variable(self) -> Option<&'static str> {
         match self {
             Self::Dsh => Some("DEEPSEEK_API_KEY"),
-            Self::Codex | Self::Claude | Self::Kimi | Self::Grok | Self::Muse | Self::OpenCode | Self::Copilot => {
-                None
-            }
-            
+            Self::Codex
+            | Self::Claude
+            | Self::Kimi
+            | Self::Grok
+            | Self::Muse
+            | Self::OpenCode
+            | Self::Copilot => None,
+        }
+    }
+
     /// A variable this harness accepts a token from instead of its own
     /// login. A profile that names it in `environment` authenticates with
     /// [`AuthScheme::ApiKey`]; one that does not uses the harness's login.
@@ -613,7 +619,6 @@ impl HarnessKind {
             | Self::Grok
             | Self::Muse
             | Self::OpenCode
-            | Self::Mimo
             | Self::Dsh => None,
         }
     }
@@ -711,7 +716,7 @@ impl HarnessKind {
             | Self::Grok
             | Self::Muse
             | Self::OpenCode
-            | Self::Dsh 
+            | Self::Dsh
             | Self::Copilot => &["skills"],
         }
     }
@@ -734,7 +739,9 @@ impl HarnessKind {
         match self {
             Self::Claude => &["skills/synced", "skills/.trash"],
             Self::Codex => &["skills/.system"],
-            Self::Kimi | Self::Grok | Self::Muse | Self::OpenCode | Self::Dsh | Self::Copilot => &[],
+            Self::Kimi | Self::Grok | Self::Muse | Self::OpenCode | Self::Dsh | Self::Copilot => {
+                &[]
+            }
         }
     }
 
@@ -1159,7 +1166,7 @@ impl HarnessKind {
     /// `supports_delegation_tools`, which OpenCode satisfies without having
     /// the gate.
     pub const fn supports_review_gate(self) -> bool {
-        matches!(self, Self::Claude | Self::Codex | Self::Dsh)
+        matches!(self, Self::Claude | Self::Codex | Self::Dsh | Self::Copilot)
     }
 
     /// Whether the harness has sub-agents of its own, which the Native
@@ -1197,7 +1204,9 @@ impl HarnessKind {
         match self {
             Self::Grok => Some("bin/agent"),
             Self::Claude => Some("node_modules/.bin/claude"),
-            Self::Codex | Self::Kimi | Self::Muse | Self::OpenCode | Self::Dsh | Self::Copilot => None,
+            Self::Codex | Self::Kimi | Self::Muse | Self::OpenCode | Self::Dsh | Self::Copilot => {
+                None
+            }
         }
     }
 

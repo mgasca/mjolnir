@@ -617,7 +617,6 @@ fn copilot_keychain_reports_authenticated(_executor: &impl CommandExecutor) -> b
     false
 }
 
-#[cfg(any(target_os = "macos", test))]
 fn claude_credentials_contain_login(credentials: &[u8]) -> bool {
     let Ok(document) = serde_json::from_slice::<serde_json::Value>(credentials) else {
         return false;

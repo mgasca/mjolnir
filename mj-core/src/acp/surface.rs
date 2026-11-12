@@ -522,13 +522,12 @@ mod tests {
         assert_eq!(surface.current_mode(), Some("plan"));
     }
 
-    /// Leaving Plan selects the normal mode each harness's `mode` select
-    /// offers: OpenCode's `build` and dsh-acp's `agent`.
+    /// Leaving Plan selects the normal mode each harness's `mode` select offers.
     #[test]
     fn plan_exit_selects_each_harness_own_normal_mode() {
-        for (harness, normal) in [
-            (HarnessKind::OpenCode, "build"),
-            (HarnessKind::Dsh, "agent"),
+        for (harness, normal, plan) in [
+            (HarnessKind::OpenCode, "build", "plan"),
+            (HarnessKind::Dsh, "agent", "plan"),
             (HarnessKind::Copilot, COPILOT_AGENT_MODE, COPILOT_PLAN_MODE),
         ] {
             let mut surface = AcpSessionSurface::default();
